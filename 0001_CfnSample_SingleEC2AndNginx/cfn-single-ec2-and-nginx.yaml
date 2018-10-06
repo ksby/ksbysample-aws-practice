@@ -118,10 +118,8 @@ Resources:
                 Action:
                   - logs:Create*
                   - logs:PutLogEvents
-                  - s3:GetObject
                 Resource:
                   - arn:aws:logs:*:*:*
-                  - arn:aws:s3:::*
   EC2WebInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
