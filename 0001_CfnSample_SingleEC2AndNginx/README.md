@@ -2,6 +2,7 @@
 
 * [長期サポート (LTS) を付随した Amazon Linux 2 が一般公開](https://aws.amazon.com/jp/about-aws/whats-new/2018/06/announcing-amazon-linux-2-with-long-term-support/)
 * [Amazon Linux 2 に関するよくある質問](https://aws.amazon.com/jp/amazon-linux-2/faqs/)
+* [AWSのEC2で行うAmazon Linux2の初期設定](https://qiita.com/2no553/items/e87485e3fc4199bd5dcb)
 
 # コマンド
 
