@@ -1,0 +1,138 @@
+################################################################################
+#
+#  0001
+#  EC2 Instance x 1 に nginx をインストールしてインターネット経由でアクセスできるようにする
+#
+AWSTemplateFormatVersion: 2010-09-09
+Description: Single EC2 and nginx
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: ksby
+    Description: Service Name
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: KeyPair Name
+
+Mappings:
+  StackConfig:
+    VPC:
+      CIDR: 10.0.0.0/16
+    PublicSubnetA:
+      CIDR: 10.0.0.0/24
+      AvailabilityZoneIndex: 1  # 東京リージョンでは ap-northeast-1b
+    EC2:
+      InstanceType: t3.nano
+      ImageId: ami-06962fe7164c1fe7b
+
+Resources:
+  #########################
+  # VPC
+  #########################
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [ StackConfig, VPC, CIDR ]
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "vpc" ] ]
+
+  #########################
+  # Subnet
+  #########################
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select
+        - Fn::FindInMap: [ StackConfig, PublicSubnetA, AvailabilityZoneIndex ]
+        - Fn::GetAZs: !Ref "AWS::Region"
+      CidrBlock: !FindInMap [ StackConfig, PublicSubnetA, CIDR ]
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "a-subnet-public" ] ]
+
+  #########################
+  # InternetGateway
+  #########################
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "inetgw" ] ]
+  AttatchGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  #########################
+  # RouteTable
+  #########################
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "routetable-public" ] ]
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttatchGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+  AssociatePublicRouteTableToPublicSubnetA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetA
+
+  #########################
+  # EC2 Web
+  #########################
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ServiceName, "sg-web" ] ]
+      GroupDescription: Web EC2 Security Group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - Description: ssh
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+        - Description: http
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "sg-web" ] ]
+  EC2WebA:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !FindInMap [ StackConfig, EC2, InstanceType ]
+      KeyName: !Ref KeyPair
+      ImageId: !FindInMap [ StackConfig, EC2, ImageId ]
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref WebSecurityGroup
+          SubnetId: !Ref PublicSubnetA
+      UserData: !Base64 |
+        #!/bin/bash
+        yum update -y
+        amazon-linux-extras install nginx1.12 -y
+        systemctl start nginx
+        systemctl enable nginx
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
