@@ -130,9 +130,14 @@ Resources:
       UserData: !Base64 |
         #!/bin/bash
         yum update -y
+
+        timedatectl status
         timedatectl set-timezone Asia/Tokyo
+
+        localectl status
         localectl set-locale LANG=ja_JP.UTF-8
         localectl set-keymap jp106
+
         amazon-linux-extras install nginx1.12 -y
         systemctl start nginx
         systemctl enable nginx
