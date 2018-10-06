@@ -214,6 +214,15 @@ Resources:
               mode: "000400"
               owner: "root"
               group: "root"
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.EC2WebA.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2WebA --region ${AWS::Region}
+              mode: "000400"
+              owner: "root"
+              group: "root"
     Properties:
       InstanceType: !FindInMap [ StackConfig, EC2, InstanceType ]
       KeyName: !Ref KeyPair
@@ -229,27 +238,32 @@ Resources:
         "Fn::Base64":
           !Sub |
             #!/bin/bash
+            function error_exit {
+              /opt/aws/bin/cfn-signal -e 1 -r $1 --stack ${AWS::StackId} --resource EC2WebA --region ${AWS::Region}
+              exit 1
+            }
+
             yum update -y
 
             timedatectl status
-            timedatectl set-timezone Asia/Tokyo
+            timedatectl set-timezone Asia/Tokyo || error_exit "Failed to run timedatectl set-timezone"
 
             localectl status
-            localectl set-locale LANG=ja_JP.UTF-8
-            localectl set-keymap jp106
+            localectl set-locale LANG=ja_JP.UTF-8 || error_exit "Failed to run localectl set-locale"
+            localectl set-keymap jp106 || error_exit "Failed to run localectl set-keymap"
 
-            amazon-linux-extras install nginx1.12 -y
-            systemctl start nginx
-            systemctl enable nginx
+            amazon-linux-extras install nginx1.12 -y || error_exit "Failed to run amazon-linux-extras install nginx1.12"
+            systemctl start nginx || error_exit "Failed to run systemctl start nginx"
+            systemctl enable nginx || error_exit "Failed to run systemctl enable nginx"
 
-            yum update -y aws-cfn-bootstrap
-            yum install awslogs -y
-            # Start cfn-init
-            /opt/aws/bin/cfn-init -s ${AWS::StackId} -r EC2WebA --region ${AWS::Region}
-            # Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata
-            /opt/aws/bin/cfn-hup
-            systemctl start awslogsd
-            systemctl enable awslogsd
+            yum update aws-cfn-bootstrap -y || error_exit "Failed to run yum update aws-cfn-bootstrap"
+            yum install awslogs -y || error_exit "Failed to run yum install awslogs"
+            /opt/aws/bin/cfn-init -s ${AWS::StackId} -r EC2WebA --region ${AWS::Region} || error_exit "Failed to run cfn-init"
+            /opt/aws/bin/cfn-hup || error_exit "Failed to run cfn-hup"
+            systemctl start awslogsd || error_exit "Failed to run systemctl start awslogsd"
+            systemctl enable awslogsd || error_exit "Failed to run systemctl enable awslogsd"
+
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource EC2WebA --region ${AWS::Region}
       Tags:
         - Key: Name
           Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
