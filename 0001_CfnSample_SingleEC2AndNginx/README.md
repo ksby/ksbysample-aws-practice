@@ -19,12 +19,14 @@ aws cloudformation validate-template \
 aws cloudformation create-stack \
     --stack-name ksbysample-0001-stack \
     --template-url https://s3-ap-northeast-1.amazonaws.com/cf-templates-ksby/cfn-single-ec2-and-nginx.yaml \
-    --parameters ParameterKey=KeyPair,ParameterValue=ksby-keypair
+    --parameters ParameterKey=KeyPair,ParameterValue=ksby-keypair \
+    --capabilities CAPABILITY_NAMED_IAM
 
 aws cloudformation update-stack \
     --stack-name ksbysample-0001-stack \
     --template-url https://s3-ap-northeast-1.amazonaws.com/cf-templates-ksby/cfn-single-ec2-and-nginx.yaml \
-    --parameters ParameterKey=KeyPair,ParameterValue=ksby-keypair
+    --parameters ParameterKey=KeyPair,ParameterValue=ksby-keypair \
+    --capabilities CAPABILITY_NAMED_IAM
 
 aws cloudformation describe-stacks --stack-name ksbysample-0001-stack
 
