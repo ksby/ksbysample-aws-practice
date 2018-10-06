@@ -4,6 +4,9 @@
 * [Amazon Linux 2 に関するよくある質問](https://aws.amazon.com/jp/amazon-linux-2/faqs/)
 * [Amazon EC2 インスタンス](https://aws.amazon.com/jp/ec2/instance-types/)
 * [AWSのEC2で行うAmazon Linux2の初期設定](https://qiita.com/2no553/items/e87485e3fc4199bd5dcb)
+* [Amazon CloudWatch Logs テンプレートスニペット](https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/quickref-cloudwatchlogs.html)
+* [CloudFormationの中で、UserData書きまくって、エラーハンドリングせずにノーガード戦法デプロイしていませんか？](https://techblog.recochoku.jp/820)
+* [クイックスタート: 実行中の EC2 Linux インスタンスに CloudWatch Logs エージェントをインストールして設定する](https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/QuickStartEC2Instance.html)
 
 # コマンド
 
@@ -34,3 +37,4 @@ aws cloudformation delete-stack --stack-name ksbysample-0001-stack
 * Amazon Linux 2 が出ていた。
 * EC2 は T3 インスタンスを使用。
 * `timedatectl set-timezone Asia/Tokyo` を実行すれば /var/log/nginx/access.log に出力される日時も日本標準時になる。
+* UserData に書いたコマンドの実行ログは /var/log/ cloud-init-output.log に出力される。

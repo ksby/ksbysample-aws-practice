@@ -1,7 +1,8 @@
 ################################################################################
 #
 #  0001
-#  EC2 Instance x 1 に nginx をインストールしてインターネット経由でアクセスできるようにする
+#  * EC2 Instance x 1 に nginx をインストールしてインターネット経由でアクセスできるようにする
+#  * /var/log/messages, /var/log/nginx/access.log を CloudWatchLogs に転送する
 #
 AWSTemplateFormatVersion: 2010-09-09
 Description: Single EC2 and nginx
@@ -93,6 +94,59 @@ Resources:
       SubnetId: !Ref PublicSubnetA
 
   #########################
+  # IAM Role
+  #########################
+  LogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: LogRolePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:Create*
+                  - logs:PutLogEvents
+                  - s3:GetObject
+                Resource:
+                  - arn:aws:logs:*:*:*
+                  - arn:aws:s3:::*
+  EC2WebInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - Ref: LogRole
+
+  #########################
+  # CloudWatchLogs
+  #########################
+  # RetentionInDays に指定可能な値は
+  # https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutRetentionPolicy.html
+  # を見ること
+  MessagesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /var/log/messages
+      RetentionInDays: 7
+  NginxAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /var/log/nginx/access.log
+      RetentionInDays: 30
+
+  #########################
   # EC2 Web
   #########################
   WebSecurityGroup:
@@ -117,6 +171,51 @@ Resources:
           Value: !Join [ "-", [ !Ref ServiceName, "sg-web" ] ]
   EC2WebA:
     Type: AWS::EC2::Instance
+    Metadata:
+      Comment: config awslog
+      AWS::CloudFormation::Init:
+        config:
+          files:
+            "/etc/awslogs/awscli.conf":
+              content: !Sub |
+                [plugins]
+                cwlogs = cwlogs
+                [default]
+                region = ${AWS::Region}
+              mode: '000600'
+              owner: root
+              group: root
+            "/etc/awslogs/awslogs.conf":
+              content: !Sub |
+                [general]
+                state_file = /var/lib/awslogs/agent-state
+
+                [/var/log/messages]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/messages
+                buffer_duration = 5000
+                log_stream_name = {instance_id}
+                initial_position = start_of_file
+                log_group_name = /var/log/messages
+
+                [/var/log/nginx/access.log]
+                datetime_format = %b %d %H:%M:%S
+                file = /var/log/nginx/access.log
+                buffer_duration = 5000
+                log_stream_name = {instance_id}
+                initial_position = start_of_file
+                log_group_name = ${NginxAccessLogGroup}
+              mode: "000644"
+              owner: "root"
+              group: "root"
+            "/etc/cfn/cfn-hup.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              mode: "000400"
+              owner: "root"
+              group: "root"
     Properties:
       InstanceType: !FindInMap [ StackConfig, EC2, InstanceType ]
       KeyName: !Ref KeyPair
@@ -127,20 +226,32 @@ Resources:
           GroupSet:
             - !Ref WebSecurityGroup
           SubnetId: !Ref PublicSubnetA
-      UserData: !Base64 |
-        #!/bin/bash
-        yum update -y
+      IamInstanceProfile: !Ref EC2WebInstanceProfile
+      UserData:
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash
+            yum update -y
 
-        timedatectl status
-        timedatectl set-timezone Asia/Tokyo
+            timedatectl status
+            timedatectl set-timezone Asia/Tokyo
 
-        localectl status
-        localectl set-locale LANG=ja_JP.UTF-8
-        localectl set-keymap jp106
+            localectl status
+            localectl set-locale LANG=ja_JP.UTF-8
+            localectl set-keymap jp106
 
-        amazon-linux-extras install nginx1.12 -y
-        systemctl start nginx
-        systemctl enable nginx
+            amazon-linux-extras install nginx1.12 -y
+            systemctl start nginx
+            systemctl enable nginx
+
+            yum update -y aws-cfn-bootstrap
+            yum install awslogs -y
+            # Start cfn-init
+            /opt/aws/bin/cfn-init -s ${AWS::StackId} -r EC2WebA --region ${AWS::Region}
+            # Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata
+            /opt/aws/bin/cfn-hup
+            systemctl start awslogsd
+            systemctl enable awslogsd
       Tags:
         - Key: Name
           Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
