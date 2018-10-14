@@ -146,23 +146,6 @@ Resources:
         - Ref: LogRole
 
   #########################
-  # CloudWatchLogs
-  #########################
-  # RetentionInDays に指定可能な値は
-  # https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutRetentionPolicy.html
-  # を見ること
-  MessagesLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /var/log/messages
-      RetentionInDays: 7
-  NginxAccessLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /var/log/nginx/access.log
-      RetentionInDays: 30
-
-  #########################
   # S3 Bucket
   #########################
   LogsS3Bucket:
@@ -195,6 +178,89 @@ Resources:
                 - arn:aws:iam::582318560864:root
 
   #########################
+  # CloudWatchLogs
+  #########################
+  # RetentionInDays に指定可能な値は
+  # https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutRetentionPolicy.html
+  # を見ること
+  MessagesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /var/log/messages
+      RetentionInDays: 7
+  NginxAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /var/log/nginx/access.log
+      RetentionInDays: 30
+
+  #########################
+  # Public ELB
+  #########################
+  PublicELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ServiceName, "sg-elb-public" ] ]
+      GroupDescription: Public ELB Security Group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - Description: http
+          IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "sg-elb-public" ] ]
+  PublicELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      LoadBalancerAttributes:
+        # ELB のログは S3 Bucket の下に日付毎に
+        # logs-ksby/AWSLogs/446693287859/elasticloadbalancing/ap-northeast-1/2018/10/14/
+        # 446693287859_elasticloadbalancing_ap-northeast-1_app.ksby-elb-public.16a9a099a6ba262d_20181014T0135Z_54.64.73.27_4okjntko.log.gz
+        # のような感じで 5分毎に .log.gz ファイルが作成される。
+        # ただしアクセスが全くない時には作成されない。
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket
+          Value: logs-ksby
+      Name: !Join [ "-", [ !Ref ServiceName, "elb-public" ] ]
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+      SecurityGroups:
+        - !Ref PublicELBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "elb-public" ] ]
+  PublicELBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Join [ "-", [ !Ref ServiceName, "tg-elb-public" ] ]
+      Port: 80
+      Protocol: HTTP
+      Targets:
+        - Id: !Ref EC2WebA
+          Port: 80
+        - Id: !Ref EC2WebB
+          Port: 80
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ServiceName, "tg-elb-public" ] ]
+  PublicELBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref PublicELBTargetGroup
+      LoadBalancerArn: !Ref PublicELB
+      Port: 80
+      Protocol: HTTP
+
+  #########################
   # EC2 Web
   #########################
   WebSecurityGroup:
@@ -211,9 +277,9 @@ Resources:
           ToPort: 22
         - Description: http
           IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
           FromPort: 80
           ToPort: 80
+          SourceSecurityGroupId: !Ref PublicELBSecurityGroup
       Tags:
         - Key: Name
           Value: !Join [ "-", [ !Ref ServiceName, "sg-web" ] ]
@@ -297,8 +363,8 @@ Resources:
 
             /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource EC2WebA --region ${AWS::Region}
       Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
+      - Key: Name
+        Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
   EC2WebB:
     Type: AWS::EC2::Instance
     Metadata:
@@ -382,68 +448,6 @@ Resources:
         - Key: Name
           Value: !Join [ "-", [ !Ref ServiceName, "b-web-ec2" ] ]
 
-  #########################
-  # Public ELB
-  #########################
-  PublicELBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Join [ "-", [ !Ref ServiceName, "sg-elb-public" ] ]
-      GroupDescription: Public ELB Security Group
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - Description: http
-          IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
-          FromPort: 80
-          ToPort: 80
-      Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref ServiceName, "sg-elb-public" ] ]
-  PublicELB:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      LoadBalancerAttributes:
-        # ELB のログは S3 Bucket の下に日付毎に
-        # logs-ksby/AWSLogs/446693287859/elasticloadbalancing/ap-northeast-1/2018/10/14/
-        # 446693287859_elasticloadbalancing_ap-northeast-1_app.ksby-elb-public.16a9a099a6ba262d_20181014T0135Z_54.64.73.27_4okjntko.log.gz
-        # のような感じで 5分毎に .log.gz ファイルが作成される。
-        # ただしアクセスが全くない時には作成されない。
-        - Key: access_logs.s3.enabled
-          Value: true
-        - Key: access_logs.s3.bucket
-          Value: logs-ksby
-      Name: !Join [ "-", [ !Ref ServiceName, "elb-public" ] ]
-      Scheme: internet-facing
-      Subnets:
-        - !Ref PublicSubnetA
-        - !Ref PublicSubnetB
-      SecurityGroups:
-        - !Ref PublicELBSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref ServiceName, "elb-public" ] ]
-  PublicELBTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Join [ "-", [ !Ref ServiceName, "tg-elb-public" ] ]
-      Port: 80
-      Protocol: HTTP
-      Targets:
-        - Id: !Ref EC2WebA
-          Port: 80
-        - Id: !Ref EC2WebB
-          Port: 80
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref ServiceName, "tg-elb-public" ] ]
-  PublicELBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref PublicELBTargetGroup
-      LoadBalancerArn: !Ref PublicELB
-      Port: 80
-      Protocol: HTTP
+Outputs:
+  PublicELBDNSName:
+    Value: !GetAtt PublicELB.DNSName

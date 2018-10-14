@@ -7,6 +7,7 @@
 * [AWSのログ管理ベストプラクティス](https://www.slideshare.net/akuwano/aws-77583244)
 * [IPv6対応のELBとオートスケールなEC2をCloudFormationで作成してみた](https://dev.classmethod.jp/cloud/aws/ipv6-cfn-alb-autoscale-ec2/)
 * [Classic Load Balancer のアクセスログの有効化](https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/classic/enable-access-logs.html)
+* [awslabs/cloudwatch-logs-centralize-logs](https://github.com/awslabs/cloudwatch-logs-centralize-logs)
 
 # コマンド
 
@@ -38,3 +39,4 @@ aws cloudformation delete-stack --stack-name ksbysample-0002-stack
 
 * t3.nano, t3.micro は最大 1インスタンスしか使えない。2台のEC2サーバに指定したらエラーになった。EC2ダッシュボードの画面左側のリストから「制限」をクリックすると表示される。
 * AMI のマシンイメージID はよく変わるようだ。0001 の時と Amazon Linux 2 のマシンイメージIDが変わっていた。構築時は必ず最新版を確認すること。
+* EC2インスタンスに UserData に書いて実行するシェルスクリプトは別ファイルにして S3 に上げておいて、それを実行するようにした方が良いだろう。
