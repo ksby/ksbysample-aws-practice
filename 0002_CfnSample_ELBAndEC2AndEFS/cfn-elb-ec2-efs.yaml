@@ -132,10 +132,10 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
-                Action:
+              - Action:
                   - logs:Create*
                   - logs:PutLogEvents
+                Effect: Allow
                 Resource:
                   - arn:aws:logs:*:*:*
   EC2WebInstanceProfile:
@@ -161,6 +161,38 @@ Resources:
     Properties:
       LogGroupName: /var/log/nginx/access.log
       RetentionInDays: 30
+
+  #########################
+  # S3 Bucket
+  #########################
+  LogsS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: "logs-ksby"
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteRule
+            Status: Enabled
+            ExpirationInDays: 30
+  LogsS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: LogsS3Bucket
+    Properties:
+      Bucket: !Ref LogsS3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - s3:PutObject
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:s3:::${LogsS3Bucket}/*"
+            Principal:
+              AWS:
+                # 582318560864 は ap-northeast-1(アジアパシフィック (東京)) の Elastic Load Balancing アカウント ID
+                # https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/classic/enable-access-logs.html
+                - arn:aws:iam::582318560864:root
 
   #########################
   # EC2 Web
@@ -371,6 +403,16 @@ Resources:
   PublicELB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      LoadBalancerAttributes:
+        # ELB のログは S3 Bucket の下に日付毎に
+        # logs-ksby/AWSLogs/446693287859/elasticloadbalancing/ap-northeast-1/2018/10/14/
+        # 446693287859_elasticloadbalancing_ap-northeast-1_app.ksby-elb-public.16a9a099a6ba262d_20181014T0135Z_54.64.73.27_4okjntko.log.gz
+        # のような感じで 5分毎に .log.gz ファイルが作成される。
+        # ただしアクセスが全くない時には作成されない。
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket
+          Value: logs-ksby
       Name: !Join [ "-", [ !Ref ServiceName, "elb-public" ] ]
       Scheme: internet-facing
       Subnets:

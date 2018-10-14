@@ -2,6 +2,11 @@
 
 * [(2017年12月時点) 私的 CloudFormation ベストプラクティス](https://qiita.com/yasuhiroki/items/8463eed1c78123313a6f)
 * [チュートリアル: Amazon マシンイメージ ID を参照する](https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/walkthrough-custom-resources-lambda-lookup-amiids.html)
+* [CloudFormationでALBを構築する](https://dev.classmethod.jp/cloud/aws/cloudformation-alb/)
+* [LoadBalancerAttribute](https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/APIReference/API_LoadBalancerAttribute.html)
+* [AWSのログ管理ベストプラクティス](https://www.slideshare.net/akuwano/aws-77583244)
+* [IPv6対応のELBとオートスケールなEC2をCloudFormationで作成してみた](https://dev.classmethod.jp/cloud/aws/ipv6-cfn-alb-autoscale-ec2/)
+* [Classic Load Balancer のアクセスログの有効化](https://docs.aws.amazon.com/ja_jp/elasticloadbalancing/latest/classic/enable-access-logs.html)
 
 # コマンド
 
