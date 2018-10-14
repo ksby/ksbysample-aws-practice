@@ -261,6 +261,46 @@ Resources:
       Protocol: HTTP
 
   #########################
+  # EFS
+  #########################
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Security group for mount target
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '2049'
+          ToPort: '2049'
+          CidrIp: 0.0.0.0/0
+  EFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      FileSystemTags:
+        - Key: Name
+          Value: "ksby-Web-Contents"
+  MountTargetPublicSubnetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: EFSFileSystem
+      SubnetId:
+        Ref: PublicSubnetA
+      SecurityGroups:
+        - Ref: EFSSecurityGroup
+  MountTargetPublicSubnetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: EFSFileSystem
+      SubnetId:
+        Ref: PublicSubnetB
+      SecurityGroups:
+        - Ref: EFSSecurityGroup
+
+  #########################
   # EC2 Web
   #########################
   WebSecurityGroup:
@@ -351,6 +391,11 @@ Resources:
             localectl set-locale LANG=ja_JP.UTF-8 || error_exit "Failed to run localectl set-locale"
             localectl set-keymap jp106 || error_exit "Failed to run localectl set-keymap"
 
+            yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
+            mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
+            chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
+
             amazon-linux-extras install nginx1.12 -y || error_exit "Failed to run amazon-linux-extras install nginx1.12"
             systemctl start nginx || error_exit "Failed to run systemctl start nginx"
             systemctl enable nginx || error_exit "Failed to run systemctl enable nginx"
@@ -432,6 +477,11 @@ Resources:
             localectl status
             localectl set-locale LANG=ja_JP.UTF-8 || error_exit "Failed to run localectl set-locale"
             localectl set-keymap jp106 || error_exit "Failed to run localectl set-keymap"
+
+            yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
+            mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
+            chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
 
             amazon-linux-extras install nginx1.12 -y || error_exit "Failed to run amazon-linux-extras install nginx1.12"
             systemctl start nginx || error_exit "Failed to run systemctl start nginx"
