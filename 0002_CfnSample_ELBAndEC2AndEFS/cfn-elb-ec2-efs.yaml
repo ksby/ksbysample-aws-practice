@@ -206,9 +206,9 @@ Resources:
       SecurityGroupIngress:
         - Description: http
           IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
           FromPort: 80
           ToPort: 80
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
           Value: !Join [ "-", [ !Ref ServiceName, "sg-elb-public" ] ]
@@ -312,9 +312,9 @@ Resources:
       SecurityGroupIngress:
         - Description: ssh
           IpProtocol: tcp
-          CidrIp: 0.0.0.0/0
           FromPort: 22
           ToPort: 22
+          CidrIp: 0.0.0.0/0
         - Description: http
           IpProtocol: tcp
           FromPort: 80
