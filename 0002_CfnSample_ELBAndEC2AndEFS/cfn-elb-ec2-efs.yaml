@@ -274,7 +274,7 @@ Resources:
           FromPort: '2049'
           ToPort: '2049'
           CidrIp: 0.0.0.0/0
-  EFSFileSystem:
+  EFSWebContentsFileSystem:
     Type: AWS::EFS::FileSystem
     Properties:
       PerformanceMode: generalPurpose
@@ -285,7 +285,7 @@ Resources:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId:
-        Ref: EFSFileSystem
+        Ref: EFSWebContentsFileSystem
       SubnetId:
         Ref: PublicSubnetA
       SecurityGroups:
@@ -294,7 +294,7 @@ Resources:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId:
-        Ref: EFSFileSystem
+        Ref: EFSWebContentsFileSystem
       SubnetId:
         Ref: PublicSubnetB
       SecurityGroups:
@@ -325,6 +325,7 @@ Resources:
           Value: !Join [ "-", [ !Ref ServiceName, "sg-web" ] ]
   EC2WebA:
     Type: AWS::EC2::Instance
+    DependsOn: MountTargetPublicSubnetA
     Metadata:
       Comment: config awslog
       AWS::CloudFormation::Init:
@@ -393,8 +394,19 @@ Resources:
 
             yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
             mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
-            mount -t nfs4 -o nfsvers=4.1 ${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
             chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
+            i=0
+            while [ $i -lt 5 ]; do
+              touch /usr/share/nginx/html/test.file
+              if [ $? -eq 0 ]; then
+                rm /usr/share/nginx/html/test.file
+                break
+              fi
+              sleep 10s
+              i=$(( i + 1 ))
+              echo $i
+            done
 
             amazon-linux-extras install nginx1.12 -y || error_exit "Failed to run amazon-linux-extras install nginx1.12"
             systemctl start nginx || error_exit "Failed to run systemctl start nginx"
@@ -412,6 +424,7 @@ Resources:
         Value: !Join [ "-", [ !Ref ServiceName, "a-web-ec2" ] ]
   EC2WebB:
     Type: AWS::EC2::Instance
+    DependsOn: MountTargetPublicSubnetB
     Metadata:
       Comment: config awslog
       AWS::CloudFormation::Init:
@@ -480,8 +493,19 @@ Resources:
 
             yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
             mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
-            mount -t nfs4 -o nfsvers=4.1 ${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
             chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
+            i=0
+            while [ $i -lt 5 ]; do
+              touch /usr/share/nginx/html/test.file
+              if [ $? -eq 0 ]; then
+                rm /usr/share/nginx/html/test.file
+                break
+              fi
+              sleep 10s
+              i=$(( i + 1 ))
+              echo $i
+            done
 
             amazon-linux-extras install nginx1.12 -y || error_exit "Failed to run amazon-linux-extras install nginx1.12"
             systemctl start nginx || error_exit "Failed to run systemctl start nginx"
