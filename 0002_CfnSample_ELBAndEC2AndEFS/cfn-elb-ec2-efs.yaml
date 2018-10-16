@@ -14,6 +14,10 @@ Parameters:
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
     Description: KeyPair Name
+  MountTarget:
+    Type: String
+    Default: /usr/share/nginx/html
+    Description: Mount target for web contents
 
 Mappings:
   StackConfig:
@@ -393,14 +397,14 @@ Resources:
             localectl set-keymap jp106 || error_exit "Failed to run localectl set-keymap"
 
             yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
-            mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
-            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
-            chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
+            mkdir -p ${MountTarget} || error_exit "Failed to run mkdir ${MountTarget}"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ ${MountTarget} || error_exit "Failed to run mount ${MountTarget}"
+            chown root:root ${MountTarget} || error_exit "Failed to run chown ${MountTarget}"
             i=0
             while [ $i -lt 5 ]; do
-              touch /usr/share/nginx/html/test.file
+              touch ${MountTarget}/test.file
               if [ $? -eq 0 ]; then
-                rm /usr/share/nginx/html/test.file
+                rm ${MountTarget}/test.file
                 break
               fi
               sleep 10s
@@ -492,14 +496,14 @@ Resources:
             localectl set-keymap jp106 || error_exit "Failed to run localectl set-keymap"
 
             yum install nfs-utils -y || error_exit "Failed to run yum install nfs-utils"
-            mkdir -p /usr/share/nginx/html || error_exit "Failed to run mkdir /usr/share/nginx/html"
-            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /usr/share/nginx/html || error_exit "Failed to run mount /usr/share/nginx/html"
-            chown root:root /usr/share/nginx/html || error_exit "Failed to run chown /usr/share/nginx/html"
+            mkdir -p ${MountTarget} || error_exit "Failed to run mkdir ${MountTarget}"
+            mount -t nfs4 -o nfsvers=4.1 ${EFSWebContentsFileSystem}.efs.${AWS::Region}.amazonaws.com:/ ${MountTarget} || error_exit "Failed to run mount ${MountTarget}"
+            chown root:root ${MountTarget} || error_exit "Failed to run chown ${MountTarget}"
             i=0
             while [ $i -lt 5 ]; do
-              touch /usr/share/nginx/html/test.file
+              touch ${MountTarget}/test.file
               if [ $? -eq 0 ]; then
-                rm /usr/share/nginx/html/test.file
+                rm ${MountTarget}/test.file
                 break
               fi
               sleep 10s
